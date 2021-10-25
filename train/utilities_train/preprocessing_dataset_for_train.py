@@ -1,7 +1,11 @@
 import json
 import pandas as pd
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.compose import ColumnTransformer
 import pickle
-
 
 
 def read_dataset(path):
@@ -15,20 +19,37 @@ def read_json(path):
     return file
 
 
-def fill_missing_values(data, path_constant_file):
-    values_to_fill = read_json(path_constant_file)
-    return data.fillna(values_to_fill)
+def create_model_to_train(estimator):
+    """" create  classifer object with the hyper-parameters we found in our research """
+    model_to_train = estimator
+    return model_to_train
 
 
-def one_hot_encoder(data, encoder_path, columns_to_encode_file_json):
-    columns_to_encode = read_json(columns_to_encode_file_json)
-    encoder = pickle.load(open(encoder_path, 'rb'))
-    data_cat_enc = pd.DataFrame(encoder.transform(data[columns_to_encode]).toarray().astype('int'),
-                                columns=encoder.get_feature_names(columns_to_encode),
-                                index=data.index)
-    data_no_cat = data.drop(axis=1, labels=columns_to_encode)
-    data = pd.concat([data_no_cat, data_cat_enc], axis=1)
-    return data
+def create_preprocessing_pipeline(path_how_to_handle_columns):
+    """ build pipeline for preprocessing the data """
+
+    # save the column names to variables
+    json_file_handle_col = read_json(path_how_to_handle_columns)
+    cat_cols = json_file_handle_col['cat_cols']
+    impute_mean_cols = json_file_handle_col['impute_mean_cols']
+    impute_zero_cols = json_file_handle_col['impute_zero_cols']
+
+    # create an object of ColumnTransformer
+    pre_process_pipeline = ColumnTransformer([
+        ('cat_cols', OneHotEncoder(handle_unknown='ignore'), cat_cols),
+        ('impute_mean_cols', SimpleImputer(strategy='mean'), impute_mean_cols),
+        ('impute_zero_cols', SimpleImputer(strategy='constant', fill_value=0), impute_zero_cols),
+    ], remainder='drop')
+    return pre_process_pipeline
+
+
+def create_whole_pipeline(path_how_to_handle_columns='./configuration_train/handle_columns.json',
+                          estimator=AdaBoostClassifier(learning_rate=1.2, n_estimators=500)):
+    pre_process_pipeline = create_preprocessing_pipeline(path_how_to_handle_columns)
+    cls = create_model_to_train(estimator)
+    whole_pipeline = Pipeline([('pre-process', pre_process_pipeline),
+                      ('estimator', cls)])
+    return whole_pipeline
 
 
 def preprocessing_target_variable(data):
@@ -37,24 +58,14 @@ def preprocessing_target_variable(data):
     return data
 
 
-def preprocessing(data_path, missing_values_file='./configuration_train/fill_missing_values_constants.json',
-                  encoder_path='./utilities_train/one_hot_encoder',
-                  columns_to_encode_file='./configuration_train/columns_to_encode.json'):
-    data_to_process = read_dataset(data_path)
-    data_to_process = fill_missing_values(data_to_process, missing_values_file)
-    try:
-        assert data_to_process.isna().sum().sum() == 0
-    except AssertionError:
-        raise AssertionError('Not all missing values were filled')
-    data_to_process = one_hot_encoder(data_to_process, encoder_path, columns_to_encode_file)
-    data_to_process = preprocessing_target_variable(data_to_process)
-    return data_to_process
-
-
-def get_features_and_target(data, json_features_and_target='./configuration_train/final_features_and_target.json'):
+def get_features_and_target(data, json_features_and_target='./configuration_train/features_and_target.json'):
     json_file = read_json(json_features_and_target)
-    features = json_file['final_features']
+    features = json_file['features']
     target = json_file['target']
     X = data[features]
     y = data[target]
     return X, y
+
+
+
+

@@ -1,19 +1,19 @@
-import sys
-import os
-from sklearn.ensemble import AdaBoostClassifier
-from utilities_train.preprocessing_dataset_for_train import preprocessing, get_features_and_target
-import pickle
+from utilities_train import preprocessing_dataset_for_train as pre
+import joblib
+
 
 DATA_PATH = '../../../diab_ckd_data.CSV'
 
 
 def fit_save_model(data_path):
-    data = get_features_and_target(preprocessing(data_path))
-    ada_clf = AdaBoostClassifier(learning_rate=1.2, n_estimators=500)
-    ada_clf.fit(data[0], data[1])
-    with open('../model/ada_clf', 'wb') as file:
-        pickle.dump(ada_clf, file)
-
+    # Load the data
+    data = pre.read_dataset(DATA_PATH)
+    data = pre.preprocessing_target_variable(data)
+    X, y = pre.get_features_and_target(data)
+    pipline = pre.create_whole_pipeline()
+    pipline.fit(X, y)
+    # save the whole fitted pipeline
+    joblib.dump(pipline, '../model/model.pkl', compress=1)
 
 
 

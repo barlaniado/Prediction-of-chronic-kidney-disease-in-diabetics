@@ -6,9 +6,11 @@ URL = 'http://127.0.0.1:5000/predict_crf'
 
 class ObservationToPredict:
     def __init__(self, path_json_x):
-        with open(path_json_x) as x:
-            self.data = json.load(x)
-
+        try:
+            with open(path_json_x) as x:
+                self.data = json.load(x)
+        except FileNotFoundError:
+            raise FileNotFoundError('The path to the file appears to be incorrect')
         self.get_prediction()
 
     def get_prediction(self):
@@ -21,7 +23,3 @@ class ObservationToPredict:
                           f' develop chronic kidney disease in' \
                           f' the next 10 years is: {round(self.prediction, 3)}'
         return string_to_print
-
-
-if __name__ == '__main__':
-    print(ObservationToPredict('./sample.json'))
